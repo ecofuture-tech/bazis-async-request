@@ -55,7 +55,6 @@ class AsyncRequestMiddleware:
 
         if self._no_bg_prefixes is None:
             scope_app = scope.get("app")
-            print(scope_app.user_middleware)
             self._no_bg_prefixes = self._build_no_bg_prefixes(scope_app or self.app)
 
         path = scope.get("path", "")
@@ -89,7 +88,7 @@ class AsyncRequestMiddleware:
 
         payload = build_request_payload(request)
         message = await enqueue_task_async(
-            topic_name=settings.KAFKA_TOPIC_ASYNC_REQUEST,
+            topic_name=settings.KAFKA_TOPIC_ASYNC_BG,
             channel_name=channel_name,
             payload=payload,
             partition_marker=(

@@ -1,5 +1,5 @@
 # 1. Base stage
-FROM python:3.14-slim-bookworm AS base
+FROM python:3.13-slim-bookworm AS base
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BAZIS_ASYNC_REQUEST=0.0.0 \
     UV_SYSTEM_PYTHON=1 \

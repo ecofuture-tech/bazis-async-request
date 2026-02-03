@@ -36,7 +36,7 @@ if settings.KAFKA_GROUP_ID:
     _subscriber_kwargs["group_id"] = settings.KAFKA_GROUP_ID
 
 
-@get_broker_for_consumer().subscriber(settings.KAFKA_TOPIC_ASYNC_REQUEST, **_subscriber_kwargs)
+@get_broker_for_consumer().subscriber(settings.KAFKA_TOPIC_ASYNC_BG, **_subscriber_kwargs)
 async def consumer_async_requests(task: KafkaTask[AsyncRequestPayload]):
     """Executes a background HTTP request from Kafka."""
 

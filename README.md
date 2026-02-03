@@ -17,7 +17,7 @@ BS_INSTALLED_APPS='["bazis.contrib.async_request", "bazis.contrib.async_backgrou
 BS_BAZIS_CONFIG_APPS='["bazis.contrib.async_request", "bazis.contrib.async_background", ...]'
 BS_KAFKA_TASKS='["bazis.contrib.async_request.tasks"]'
 BS_KAFKA_BOOTSTRAP_SERVERS=localhost:9093
-BS_KAFKA_TOPIC_ASYNC_REQUEST=my_app_develop_async_request
+BS_KAFKA_TOPIC_ASYNC_BG=my_app_develop_async_request
 BS_KAFKA_GROUP_ID=my_app_develop
 
 # Run consumer in Kubernetes
@@ -154,7 +154,7 @@ KAFKA_TASKS='["bazis.contrib.async_request.tasks"]'
 
 # Kafka settings
 KAFKA_BOOTSTRAP_SERVERS=localhost:9093
-KAFKA_TOPIC_ASYNC_REQUEST=my_app_develop_async_request
+KAFKA_TOPIC_ASYNC_BG=my_app_develop_async_request
 KAFKA_GROUP_ID=my_app_develop
 
 # Optional settings
@@ -178,7 +178,7 @@ BS_KAFKA_TASKS='["bazis.contrib.async_request.tasks"]'
 
 - `KAFKA_TASKS` — dotted module paths imported by the consumer to register tasks
 - `KAFKA_BOOTSTRAP_SERVERS` — Kafka broker address
-- `KAFKA_TOPIC_ASYNC_REQUEST` — topic for async tasks
+- `KAFKA_TOPIC_ASYNC_BG` — topic for async tasks
 - `KAFKA_GROUP_ID` — consumer group
 - `KAFKA_CONSUMER_LIFETIME_SEC` — consumer working time before restart
 - `KAFKA_CONSUMER_LIFETIME_JITTER_SEC` — random deviation to avoid simultaneous restart
