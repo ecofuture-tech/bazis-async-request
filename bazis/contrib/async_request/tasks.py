@@ -56,20 +56,14 @@ async def consumer_async_requests(task: KafkaTask[AsyncRequestPayload]):
             status=TaskStatus.FAILED,
             response={"error": str(err)},
         )
-        raise
-
-    await set_and_publish_status_async(
-        task_id=task.task_id,
-        channel_name=task.channel_name,
-        status=TaskStatus.COMPLETED,
-        response=response,
-    )
-
-    logger.info(
-        "Processed task_id=%s with status=%s.",
-        task.task_id,
-        response.get("status"),
-    )
+    else:
+        logger.info("Processed task_id=%s with status=%s.", task.task_id, response.get("status"))
+        await set_and_publish_status_async(
+            task_id=task.task_id,
+            channel_name=task.channel_name,
+            status=TaskStatus.COMPLETED,
+            response=response,
+        )
 
 
 async def execute_internal_request(task: KafkaTask[AsyncRequestPayload]) -> dict:
