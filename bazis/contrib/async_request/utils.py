@@ -48,7 +48,9 @@ def build_request_payload(request: Request) -> AsyncRequestPayload:
             headers.append((k_val, v_val))
 
     return AsyncRequestPayload(
-        path=request.url.path,
+        path=request.scope["path"],
+        raw_path=(request.scope.get("raw_path") or b"").decode("latin-1") or None,
+        root_path=request.scope.get("root_path", ""),
         query_string=request.url.query,
         headers=headers,
         request_client=request.client,

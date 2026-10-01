@@ -19,7 +19,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class AsyncRequestPayload(BaseModel):
     """Payload of a background HTTP request serialized for Kafka."""
 
-    path: str = Field(..., description="Request path")
+    path: str = Field(..., description="Request path (decoded, as in the ASGI scope)")
+    raw_path: str | None = Field(None, description="Request path as received (latin-1)")
+    root_path: str = Field("", description="ASGI root path of the application")
     query_string: str = Field(..., description="Query string")
     #: all headers of the request (Authorization included: the request is executed with
     #: the credentials of the client), stored in the Kafka topic
