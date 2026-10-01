@@ -27,7 +27,7 @@ from bazis.contrib.async_background.producer import enqueue_task_async
 from bazis.contrib.async_background.routes import get_async_background_response
 from bazis.contrib.async_background.utils import ChannelNameError, resolve_channel_name_async
 
-from .utils import build_request_payload
+from .utils import build_request_payload, is_internal_request
 
 
 logger = logging.getLogger(__name__)
@@ -63,10 +63,7 @@ class AsyncRequestMiddleware:
             return
 
         headers = Headers(scope=scope)
-        if (
-            headers.get("X-Async-Background-Internal", "").lower() == "true"
-            or "X-Async-Background" not in headers
-        ):
+        if is_internal_request(scope) or "X-Async-Background" not in headers:
             await self.app(scope, receive, send)
             return
 

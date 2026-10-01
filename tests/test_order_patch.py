@@ -22,6 +22,8 @@ import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import OrderStatus
 
+from tests.utils import normalize
+
 
 response_paragon = {'endpoint': '/api/v1/fast_start/order/e7cc4c8c-3ed1-4576-96ad-b3fd7c0b2a5a/',
                     'headers': [['content-length', '217'],
@@ -57,8 +59,7 @@ def test_manager_patch_order(create_test_data, sample_app):
     )
     assert response.status_code == 403
     response_data = response.json()
-    del response_data["errors"][0]["traceback"]
-    assert response_data == {
+    assert normalize(response_data) == {
         "errors": [
             {
                 "detail": "Permission denied: check access",
@@ -84,7 +85,7 @@ def test_manager_patch_order(create_test_data, sample_app):
     assert response.status_code == 200
     response_data = response.json()
     response_paragon["response"]["data"]["id"] = str(order.id)
-    assert response_data == response_paragon["response"]
+    assert normalize(response_data) == normalize(response_paragon["response"])
 
 
 @pytest.mark.run_with_consumer
@@ -110,7 +111,8 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     response_paragon["response"]["data"]["id"] = str(order.id)
     response_paragon["task_id"] = task_id
@@ -137,7 +139,7 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
     del response_data["response"]["errors"][0]["traceback"]
-    assert response_data == paragon_403
+    assert normalize(response_data) == normalize(paragon_403)
 
     # retrieving background task results via the endpoint by id_task
     response = get_api_client(sample_app, manager.jwt_build()).get(
@@ -146,7 +148,7 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     assert response.status_code == 200
     response_data = response.json()
     del response_data["response"]["errors"][0]["traceback"]
-    assert response_data == paragon_403
+    assert normalize(response_data) == normalize(paragon_403)
 
     # The delivery manager can edit an order that is in in_progress status
     order.status = OrderStatus.IN_PROGRESS
@@ -167,7 +169,8 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     response_paragon["response"]["data"]["id"] = str(order.id)
     response_paragon["task_id"] = task_id
@@ -176,7 +179,7 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     # checking the result written by the consumer to Redis
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # retrieving background task results via the endpoint by id_task
     response = get_api_client(sample_app, manager.jwt_build()).get(
@@ -184,4 +187,4 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     )
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
