@@ -58,7 +58,7 @@ python manage.py kafka_consumer_multiple --consumers-count=5
 - **WebSocket notifications** — automatic user notification about task status
 - **API endpoint** — retrieving results by task_id
 
-**How it works**: When sending a request with the `X-Async-Request: true` header, the request is not executed immediately but is placed in the Kafka queue. The consumer retrieves the task from the queue, executes it, saves the result in Redis, and sends a notification to the user via WebSocket.
+**How it works**: When sending a request with the `X-Async-Background: true` header, the request is not executed immediately but is placed in the Kafka queue. The consumer retrieves the task from the queue, executes it, saves the result in Redis, and sends a notification to the user via WebSocket.
 
 **This package requires the installation of `bazis`, `bazis-users`, `bazis-ws` packages and running Kafka and Redis servers.**
 
@@ -102,7 +102,7 @@ This waits for the pytest container to finish and streams logs only from the Pyt
 ┌─────────────┐
 │   Client    │
 └──────┬──────┘
-       │ POST + X-Async-Request: true
+       │ POST + X-Async-Background: true
        ▼
 ┌─────────────────────┐
 │   API Endpoint      │
@@ -207,23 +207,25 @@ This adds the endpoint: `GET /api/v1/async_background_response/{task_id}/`
 ### Project-Level Middleware
 
 AsyncRequestMiddleware is registered automatically when `bazis.contrib.async_request` is loaded.
-Any request can be moved to background using the `X-Async-Request: true` header.
+Any request can be moved to background using the `X-Async-Background: true` header.
 
 **Location**: `bazis.contrib.async_request.middleware.AsyncRequestMiddleware`
 
 ### Endpoint-Only Async Request (Dependency)
 
 Use a dependency to mark specific endpoints as async-only. Such routes will return `409 Conflict`
-unless the request includes `X-Async-Request` (or an internal background call with
-`X-Async-Request-Internal: true`).
+unless the request is executed in the background (the client sends it with
+`X-Async-Background: true`, and the consumer executes it). The consumer marks its requests
+in the ASGI scope, which clients cannot forge; the former `X-Async-Background-Internal`
+header is ignored.
 
-**Location**: `bazis.contrib.async_request.dependencies.require_async`
+**Location**: `bazis.contrib.async_request.utils.require_async`
 
 #### Attach to a Single Route
 
 ```python
 from fastapi import Depends
-from bazis.contrib.async_request.dependencies import require_async
+from bazis.contrib.async_request.utils import require_async
 
 @router.post(
     "/reports/generate/",
@@ -237,12 +239,12 @@ async def generate_report(...):
 
 ```python
 from fastapi import Depends
-from bazis.contrib.async_request.dependencies import require_async
+from bazis.contrib.async_request.utils import require_async
 
 @router.post("/reports/generate/")
 async def generate_report(
     ...,
-    _async_request: None = Depends(require_async),
+    async_request: None = Depends(require_async),
 ):
     ...
 ```
@@ -272,14 +274,14 @@ Runs 5 consumers in separate processes. Suitable for local development or deploy
 
 ### Sending a Request
 
-Add the `X-Async-Request: true` header to your request:
+Add the `X-Async-Background: true` header to your request:
 
 ```bash
 curl -X POST \
   http://localhost/api/v1/orders/order/ \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
-  -H "X-Async-Request: true" \
+  -H "X-Async-Background: true" \
   -d '{
     "data": {
       "type": "myapp.order",
@@ -302,11 +304,12 @@ curl -X POST \
 }
 ```
 
-If the request has no `Authorization` header, pass a channel name directly:
+A client without a user token sends an anonymous token it generated itself (16–128
+characters `A-Z a-z 0-9 _ -`, e.g. a random UUID) as `Authorization: Bearer <token>`; the same
+token subscribes to its WebSocket channel (bazis-ws) and reads the result.
 
-```bash
-X-Async-Request: <channel_name>
-```
+The request is stored in the Kafka topic with all its headers, `Authorization` included, and
+executed later with them: protect the topic accordingly.
 
 Save the `async_request_id` — this is the task identifier for retrieving the result.
 
@@ -478,7 +481,7 @@ class AsyncReportClient {
       headers: {
         'Authorization': `Bearer ${this.token}`,
         'Content-Type': 'application/vnd.api+json',
-        'X-Async-Request': 'true'
+        'X-Async-Background': 'true'
       },
       body: JSON.stringify({
         data: {
@@ -608,7 +611,7 @@ Content-Type: application/json
 # Asynchronous request (returns task_id immediately)
 POST /api/v1/generate-analytics/
 Content-Type: application/json
-X-Async-Request: true
+X-Async-Background: true
 
 {
   "report_type": "sales",

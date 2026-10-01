@@ -22,6 +22,16 @@ from .schemas import AsyncRequestPayload
 
 logger = logging.getLogger(__name__)
 
+#: the ASGI scope key that marks a request executed by the consumer
+SCOPE_INTERNAL_KEY = "bazis_async_request_internal"
+
+
+def is_internal_request(scope) -> bool:
+    """
+    Whether the request is executed by the consumer of async requests.
+    """
+    return scope.get(SCOPE_INTERNAL_KEY) is True
+
 
 def build_request_payload(request: Request) -> AsyncRequestPayload:
     """Creates a payload for sending to Kafka."""
@@ -33,17 +43,14 @@ def build_request_payload(request: Request) -> AsyncRequestPayload:
 
     headers: list[tuple[str, str]] = []
     for k, v in request.scope.get("headers", []):
-        try:
-            k_val, v_val = k.decode(), v.decode()
-            if k_val.lower() not in ("x-async-background",):
-                headers.append((k_val, v_val))
-        except Exception as e:
-            logger.exception("Error decoding header: %s", e)
-
-    headers.append(("x-async-background-internal", "true"))
+        k_val, v_val = k.decode("latin-1"), v.decode("latin-1")
+        if k_val.lower() not in ("x-async-background", "x-async-background-internal"):
+            headers.append((k_val, v_val))
 
     return AsyncRequestPayload(
-        path=request.url.path,
+        path=request.scope["path"],
+        raw_path=(request.scope.get("raw_path") or b"").decode("latin-1") or None,
+        root_path=request.scope.get("root_path", ""),
         query_string=request.url.query,
         headers=headers,
         request_client=request.client,
@@ -56,10 +63,11 @@ def build_request_payload(request: Request) -> AsyncRequestPayload:
 
 
 async def require_async(request: Request) -> None:
-    """Allow only async-request or internal async-request requests."""
-    if request.headers.get("X-Async-Background-Internal", "").lower() == "true":
-        return
-    if "X-Async-Background" in request.headers:
+    """
+    Allows the endpoint only for requests executed in the background. The header
+    `X-Async-Background-Internal` is no longer trusted: any client could send it.
+    """
+    if is_internal_request(request.scope):
         return
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,

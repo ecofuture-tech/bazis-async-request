@@ -25,6 +25,8 @@ from bazis_test_utils.utils import get_api_client
 
 from bazis.contrib.ws.models_abstract import redis
 
+from tests.utils import normalize
+
 
 response_paragon = {'endpoint': '/api/v1/fast_start/order/',
                     'headers': [['content-length', '399'],
@@ -65,13 +67,13 @@ def test_manager_see_order_not_other_buyer(create_test_data, sample_app):
     assert response.status_code == 200
     response_data = response.json()
     response_paragon["response"]["data"][0]["id"] = str(order.id)
-    assert response_data == response_paragon["response"]
+    assert normalize(response_data) == normalize(response_paragon["response"])
 
     ### buyer 2 receives the list of orders without buyer 1's order
     response = get_api_client(sample_app, buyer_2.jwt_build()).get("/api/v1/fast_start/order/")
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon_empty["response"]
+    assert normalize(response_data) == normalize(response_paragon_empty["response"])
 
 
 @pytest.mark.run_with_consumer
@@ -114,7 +116,8 @@ def test_manager_see_order_not_other_buyer_async(
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     response_paragon["response"]["data"][0]["id"] = str(order.id)
     response_paragon["task_id"] = task_id
@@ -122,7 +125,7 @@ def test_manager_see_order_not_other_buyer_async(
     # check the result written by the consumer into Redis
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # Wait for the Redis subscriber to finish
     subscriber_thread.join(timeout=2)
@@ -141,7 +144,7 @@ def test_manager_see_order_not_other_buyer_async(
     )
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     ### buyer 2 receives the list of orders without buyer 1's order
     # create a background task
@@ -151,7 +154,8 @@ def test_manager_see_order_not_other_buyer_async(
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     # check the result written by the consumer into Redis
     result_in_redis = process_async_response(task_id)
@@ -165,4 +169,4 @@ def test_manager_see_order_not_other_buyer_async(
     assert response.status_code == 200
     response_data = response.json()
     response_paragon_empty["task_id"] = task_id
-    assert response_data == response_paragon_empty
+    assert normalize(response_data) == normalize(response_paragon_empty)

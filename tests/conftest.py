@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import json
-import os
 import time
 
 from django.contrib.auth import get_user_model
@@ -157,12 +156,12 @@ def fast_start_setup_groups_and_roles(db):
 
 @pytest.fixture
 def process_async_response():
-    from bazis.contrib.ws.models_abstract import redis
+    from bazis.contrib.async_background.utils import redis, task_key
 
-    def _run(task_id: str, timeout: int = 45) -> dict:
+    def _run(task_id: str, timeout: int = 45) -> bytes:
         # Wait for status "completed" (processed by external consumer)
         for _ in range(timeout):
-            if redis_data := redis.get(task_id):
+            if redis_data := redis.get(task_key(task_id)):
                 data_dict = json.loads(redis_data.decode("utf-8"))
                 if data_dict.get("status") == "completed":
                     return redis_data
@@ -206,13 +205,40 @@ def create_test_data(fast_start_setup_groups_and_roles):
     return shop, manager, buyer_1, buyer_2, order
 
 
-@pytest.fixture(scope="session", autouse=True)
-def ensure_docker_stack_only():
-    if os.environ.get("PYTEST_IN_DOCKER") != "1":
-        pytest.fail("Run tests only via docker compose (PYTEST_IN_DOCKER=1).")
-    time.sleep(2)
+@pytest.fixture(autouse=True)
+def wait_for_background_tasks(request):
+    """
+    The consumer works with the test database: a test must not end (and flush the database)
+    while the consumer still executes one of its tasks.
+    """
     yield
+    if "run_with_consumer" not in request.keywords:
+        return
+    from bazis.contrib.async_background.utils import TASK_KEY_PREFIX, redis
+
+    for _ in range(60):
+        statuses = {
+            json.loads(value)["status"]
+            for key in redis.scan_iter(f"{TASK_KEY_PREFIX}*")
+            if (value := redis.get(key))
+        }
+        if not statuses - {"completed", "failed"}:
+            break
+        time.sleep(0.5)
+    for key in redis.scan_iter(f"{TASK_KEY_PREFIX}*"):
+        redis.delete(key)
 
 
 def pytest_collection_modifyitems(config, items):
-    return
+    """
+    The tests marked `run_with_consumer` need Kafka and a running consumer
+    (`python manage.py kafka_consumer_single` in `sample`, see CLAUDE.md).
+    """
+    from django.conf import settings
+
+    if settings.KAFKA_ENABLED:
+        return
+    skip = pytest.mark.skip(reason="Kafka is not configured (BS_KAFKA_BOOTSTRAP_SERVERS)")
+    for item in items:
+        if "run_with_consumer" in item.keywords:
+            item.add_marker(skip)

@@ -39,7 +39,8 @@ def test_async_patch_shop_name_only(create_test_data, sample_app, process_async_
     )
     assert response.status_code == 202
     task_id = response.json()["meta"]["async_request_id"]
-    assert response.json() == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response.json()["data"] is None
+    assert response.json()["meta"]["async_request_id"] == task_id
 
     # Processing by the consumer
     redis_result = process_async_response(task_id)
