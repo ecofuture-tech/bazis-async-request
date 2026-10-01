@@ -1,0 +1,52 @@
+# What the package is for and how to use it, for tools and AI agents (see AGENTS.md).
+# `import` paths and `check` ids are verified by tests/test_manifest.py.
+
+[package]
+name = "bazis-async-request"
+summary = "run any HTTP request of the API in the background through Kafka (X-Async-Background)"
+solves = [
+    "move slow requests or bulk changes to the background without new endpoints",
+    "restrict an endpoint to requests executed in the background",
+]
+requires = ["bazis", "bazis-async-background"]
+pairs_well = ["bazis-users", "bazis-permit"]
+
+[[extension_points]]
+name = "AsyncRequestMiddleware"
+import = "bazis.contrib.async_request.middleware.AsyncRequestMiddleware"
+use_when = "add to the application: app.add_middleware(AsyncRequestMiddleware)"
+
+[[extension_points]]
+name = "require_async"
+import = "bazis.contrib.async_request.utils.require_async"
+use_when = "a dependency that allows an endpoint only for background requests (409 otherwise)"
+
+[[extension_points]]
+name = "is_internal_request"
+import = "bazis.contrib.async_request.utils.is_internal_request"
+use_when = "whether a request (ASGI scope) is executed by the consumer"
+
+[[extension_points]]
+name = "consumer_async_requests"
+import = "bazis.contrib.async_request.tasks.consumer_async_requests"
+use_when = "the consumer of the requests: list bazis.contrib.async_request.tasks in KAFKA_TASKS"
+
+[[pitfalls]]
+text = "without Kafka settings the requests with X-Async-Background are executed synchronously"
+check = "async_request.W001"
+
+[[pitfalls]]
+text = "without the route of bazis.contrib.async_background.router the middleware fails on every HTTP request"
+check = "async_request.E001"
+
+[[pitfalls]]
+text = "the middleware is not added automatically: app.add_middleware(AsyncRequestMiddleware)"
+
+[[pitfalls]]
+text = "a header must never mark a request as internal: use is_internal_request(scope)"
+
+[[pitfalls]]
+text = "only JSON bodies are queued: multipart, form and binary bodies are replayed as {}"
+
+[[pitfalls]]
+text = "a dependency in an inject_make class without a type annotation is ignored"

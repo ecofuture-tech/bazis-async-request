@@ -206,7 +206,15 @@ This adds the endpoint: `GET /api/v1/async_background_response/{task_id}/`
 
 ### Project-Level Middleware
 
-AsyncRequestMiddleware is registered automatically when `bazis.contrib.async_request` is loaded.
+Add the middleware to the application (it is not added automatically):
+
+```python
+from bazis.contrib.async_request.middleware import AsyncRequestMiddleware
+from bazis.core.app import app
+
+app.add_middleware(AsyncRequestMiddleware)
+```
+
 Any request can be moved to background using the `X-Async-Background: true` header.
 
 **Location**: `bazis.contrib.async_request.middleware.AsyncRequestMiddleware`
@@ -268,7 +276,9 @@ Runs 5 consumers in separate processes. Suitable for local development or deploy
 
 **Parameters**:
 
-- `--consumers-count` — number of consumers to run (default: 1)
+- `--consumers-count` — number of consumers to run (default: 15)
+- `--restart-delay-sec` — delay before restarting a consumer that exited (default: 1.0)
+- `--max-restarts` — restarts of a failed consumer before it is given up (default: unlimited)
 
 ## Working with Frontend
 

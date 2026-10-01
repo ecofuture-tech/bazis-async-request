@@ -23,3 +23,8 @@ class AsyncRequestConfig(BaseConfig):
     name = "bazis.contrib.async_request"
     verbose_name = _("AsyncRequest")
     default = True
+
+    def ready(self):
+        super().ready()
+
+        from . import checks  # noqa: F401  registers the system checks
