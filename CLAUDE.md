@@ -38,7 +38,7 @@ to the database name): migrate it first (`python manage.py migrate` and
 The tests marked `run_with_consumer` are skipped without Kafka settings. A local Kafka
 without Docker: download the Kafka binaries and start a single KRaft node.
 
-Lint: `ruff check bazis tests`. CI also runs `python manage.py makemigrations --check
+Lint: `ruff check bazis tests sample`. CI also runs `python manage.py makemigrations --check
 --dry-run` in `sample`: commit the migrations of model changes, including the sample apps.
 
 ## Releasing
