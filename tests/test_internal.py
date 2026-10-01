@@ -85,3 +85,35 @@ def test_consumer_executes_the_request(create_test_data, sample_app):
     assert result["response"]["data"]["attributes"]["name"] == "Changed"
     shop.refresh_from_db()
     assert shop.name == "Changed"
+
+
+def test_payload_keeps_the_path_as_received():
+    """
+    The path used to be taken from the URL (percent-encoded) and decoded once more on
+    replay, so "%2541" became "A" instead of "%41"; the root path was lost.
+    """
+    from starlette.requests import Request
+
+    from bazis.contrib.async_request.utils import build_request_payload
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "scheme": "http",
+            "http_version": "1.1",
+            "root_path": "/prefix",
+            "path": "/prefix/api/v1/file/%41 b/",
+            "raw_path": b"/prefix/api/v1/file/%2541%20b/",
+            "query_string": b"x=1",
+            "headers": [],
+            "client": ("127.0.0.1", 1),
+            "server": ("testserver", 80),
+        }
+    )
+
+    payload = build_request_payload(request)
+
+    assert payload.path == "/prefix/api/v1/file/%41 b/"
+    assert payload.raw_path == "/prefix/api/v1/file/%2541%20b/"
+    assert payload.root_path == "/prefix"

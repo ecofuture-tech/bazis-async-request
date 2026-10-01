@@ -15,7 +15,6 @@
 import asyncio
 import json
 import logging
-from urllib.parse import unquote, urlsplit
 
 from django.conf import settings
 
@@ -67,7 +66,6 @@ async def execute_internal_request(task: KafkaTask[AsyncRequestPayload]) -> dict
     """Executes an internal HTTP request and returns the result."""
     request = task.payload
 
-    url = urlsplit(request.path)
     body = json.dumps(request.body).encode("utf-8") if request.body is not None else b""
 
     headers = []
@@ -85,9 +83,14 @@ async def execute_internal_request(task: KafkaTask[AsyncRequestPayload]) -> dict
         "http_version": request.http_version,
         "method": request.method,
         "scheme": request.scheme,
-        "root_path": "",
-        "path": unquote(url.path),
-        "raw_path": url.path.encode("utf-8"),
+        "root_path": request.root_path,
+        # the stored path is already decoded (requests stored by 2.2 too)
+        "path": request.path,
+        "raw_path": (
+            request.raw_path.encode("latin-1")
+            if request.raw_path is not None
+            else request.path.encode("utf-8")
+        ),
         "query_string": request.query_string.encode(),
         "headers": headers,
         "client": tuple(request.request_client) if request.request_client else None,
