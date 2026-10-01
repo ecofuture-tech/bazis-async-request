@@ -32,7 +32,7 @@ import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import Order, OrderStatus
 
-from bazis.contrib.ws.models_abstract import redis
+from bazis.contrib.async_background.utils import redis, task_key
 
 
 @pytest.mark.run_with_consumer
@@ -78,7 +78,7 @@ def test_manager_patch_order_async(create_test_data, sample_app):
     for _ in range(180):
         processed = 0
         for order_i in range(0, 15):
-            if redis_data := redis.get(tasks[order_i]):
+            if redis_data := redis.get(task_key(tasks[order_i])):
                 data_dict = json.loads(redis_data.decode("utf-8"))
                 if data_dict["status"] == "completed":
                     processed += 1

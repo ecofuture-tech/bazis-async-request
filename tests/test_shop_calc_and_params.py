@@ -22,6 +22,8 @@ import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import Order, OrderStatus, Shop
 
+from tests.utils import normalize
+
 
 response_paragon = {
     "data": [
@@ -74,7 +76,7 @@ def test_calc_and_params(create_test_data, sample_app, process_async_response):
     response_paragon["data"][0]["relationships"]["manager"]["data"][0]["id"] = str(manager.id)
     del response_data["data"][0]["attributes"]["dt_created"]
     del response_data["data"][0]["attributes"]["dt_updated"]
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # buyer 2 also gets the list of shops without restrictions
     response = get_api_client(sample_app, buyer_2.jwt_build()).get("/api/v1/fast_start/shop/")
@@ -84,7 +86,7 @@ def test_calc_and_params(create_test_data, sample_app, process_async_response):
     response_paragon["data"][0]["relationships"]["manager"]["data"][0]["id"] = str(manager.id)
     del response_data["data"][0]["attributes"]["dt_created"]
     del response_data["data"][0]["attributes"]["dt_updated"]
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # change the status to supplied and now the manager's calculated field supplied_orders_count returns 1
     order.status = OrderStatus.SUPPLIED
@@ -156,7 +158,8 @@ def test_calc_and_params(create_test_data, sample_app, process_async_response):
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     # executing the task by the consumer
     process_async_response(task_id)

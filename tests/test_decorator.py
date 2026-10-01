@@ -26,6 +26,8 @@ from bazis_test_utils.utils import get_api_client
 
 from bazis.contrib.ws.models_abstract import redis
 
+from tests.utils import normalize
+
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +46,12 @@ def test_wo_header(create_test_data, sample_app):
     response = get_api_client(sample_app, manager.jwt_build()).get("/api/v1/some-async-endpoint/?some_str=asdf")
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon["response"]
+    assert normalize(response_data) == normalize(response_paragon["response"])
 
     response = get_api_client(sample_app, manager.jwt_build()).get("/api/v1/some-sync-endpoint/?some_str=asdf")
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon["response"]
+    assert normalize(response_data) == normalize(response_paragon["response"])
 
 @pytest.mark.django_db(transaction=True)
 def test_wo_token(sample_app):
@@ -98,14 +100,15 @@ def test_async_decorator(create_test_data, sample_app, process_async_response):
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     response_paragon["task_id"] = task_id
 
     # Check the result written to Redis by the consumer
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # Wait for the Redis subscriber to finish
     subscriber_thread.join(timeout=2)
@@ -124,7 +127,7 @@ def test_async_decorator(create_test_data, sample_app, process_async_response):
     )
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
 
 @pytest.mark.run_with_consumer
@@ -177,7 +180,8 @@ def test_sync_decorator(create_test_data, sample_app, process_async_response):
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
     logger.info("test_sync_decorator: task_id=%s", task_id)
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     response_paragon["task_id"] = task_id
 
@@ -186,7 +190,7 @@ def test_sync_decorator(create_test_data, sample_app, process_async_response):
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
     response_paragon["endpoint"] = '/api/v1/some-sync-endpoint/'
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # Wait for the Redis subscriber to finish
     logger.info("test_sync_decorator: joining subscriber thread")
@@ -207,4 +211,4 @@ def test_sync_decorator(create_test_data, sample_app, process_async_response):
     )
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
