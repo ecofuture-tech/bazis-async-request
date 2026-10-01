@@ -57,7 +57,7 @@ class ShopRouteSet(AuthorRouteBase):
 
     @inject_make(CrudApiAction.UPDATE)
     class InjectRequireAsync:
-        _async_request = Depends(require_async)
+        async_request: None = Depends(require_async)
 
     fields = {
         None: SchemaFields(

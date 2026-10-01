@@ -13,14 +13,18 @@
 # limitations under the License.
 
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AsyncRequestPayload(BaseModel):
     """Payload of a background HTTP request serialized for Kafka."""
 
-    path: str = Field(..., description="Request path")
+    path: str = Field(..., description="Request path (decoded, as in the ASGI scope)")
+    raw_path: str | None = Field(None, description="Request path as received (latin-1)")
+    root_path: str = Field("", description="ASGI root path of the application")
     query_string: str = Field(..., description="Query string")
+    #: all headers of the request (Authorization included: the request is executed with
+    #: the credentials of the client), stored in the Kafka topic
     headers: list[tuple[str | bytes, str | bytes]] = Field(
         ..., description="List of HTTP headers"
     )  # List of tuples (header_name, header_value)
@@ -31,6 +35,4 @@ class AsyncRequestPayload(BaseModel):
     scheme: str = Field(..., description="Request scheme")
     body: dict | list[dict] = Field(default_factory=dict, description="Request body")
 
-    class Config:
-        json_encoders = {bytes: lambda v: v.decode("utf-8")}
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)

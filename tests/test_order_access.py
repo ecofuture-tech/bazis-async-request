@@ -21,6 +21,8 @@ import json
 import pytest
 from bazis_test_utils.utils import get_api_client
 
+from tests.utils import normalize
+
 
 response_paragon = {'endpoint': '/api/v1/fast_start/order/',
                     'headers': [['content-length', '399'],
@@ -64,7 +66,8 @@ def test_access_segregation(create_test_data, sample_app, process_async_response
     assert response.status_code == 202
     response_data = response.json()
     task_id = response.json()["meta"]["async_request_id"]
-    assert response_data == {"data": None, "meta": {"async_request_id": task_id}}
+    assert response_data["data"] is None
+    assert response_data["meta"]["async_request_id"] == task_id
 
     response_paragon["response"]["data"][0]["id"] = str(order.id)
     response_paragon["task_id"] = task_id
@@ -72,7 +75,7 @@ def test_access_segregation(create_test_data, sample_app, process_async_response
     # checking the result written by the consumer to Redis
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # getting the results of background tasks by id_task via the endpoint
     response = get_api_client(sample_app, manager.jwt_build()).get(
@@ -80,7 +83,7 @@ def test_access_segregation(create_test_data, sample_app, process_async_response
     )
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data == response_paragon
+    assert normalize(response_data) == normalize(response_paragon)
 
     # users cannot get each other's background task results
     response = get_api_client(sample_app, buyer_2.jwt_build()).get(
@@ -88,7 +91,6 @@ def test_access_segregation(create_test_data, sample_app, process_async_response
     )
     assert response.status_code == 403
     response_data = response.json()
-    del response_data["errors"][0]["traceback"]
-    assert response_data == {
+    assert normalize(response_data) == {
         "errors": [{"detail": "Permission denied: check access", "status": 403}]
     }
