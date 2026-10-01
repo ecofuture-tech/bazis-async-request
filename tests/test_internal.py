@@ -117,3 +117,50 @@ def test_payload_keeps_the_path_as_received():
     assert payload.path == "/prefix/api/v1/file/%41 b/"
     assert payload.raw_path == "/prefix/api/v1/file/%2541%20b/"
     assert payload.root_path == "/prefix"
+
+
+@pytest.mark.parametrize('body', [b'\xff\xfe binary', b'"a string"', b'[1, 2]'])
+def test_payload_of_a_body_that_is_not_a_resource(body):
+    """
+    A binary body failed with UnicodeDecodeError and a JSON body that is not an object (or
+    a list of objects) failed the validation of the payload: 500.
+    """
+    from starlette.requests import Request
+
+    from bazis.contrib.async_request.utils import build_request_payload
+
+    request = Request(
+        {
+            'type': 'http',
+            'method': 'POST',
+            'scheme': 'http',
+            'http_version': '1.1',
+            'path': '/api/v1/files/',
+            'raw_path': b'/api/v1/files/',
+            'query_string': b'',
+            'headers': [],
+            'client': ('127.0.0.1', 1),
+            'server': ('testserver', 80),
+        }
+    )
+    request._body = body
+    assert build_request_payload(request).body == {}
+
+
+@pytest.mark.parametrize(
+    'body, marker',
+    [
+        ({'data': {'id': 'a1', 'type': 'x.y'}}, 'a1'),
+        ({'data': {'id': 7}}, '7'),
+        ({'data': [{'id': 'a1'}]}, None),
+        ({'data': None}, None),
+        ([{'data': {'id': 'a1'}}], None),
+    ],
+)
+def test_partition_marker(body, marker):
+    """
+    The relationships bodies (`data` is a list or null) failed with AttributeError: 500.
+    """
+    from bazis.contrib.async_request.middleware import partition_marker
+
+    assert partition_marker(body) == marker

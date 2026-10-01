@@ -37,8 +37,13 @@ def build_request_payload(request: Request) -> AsyncRequestPayload:
     """Creates a payload for sending to Kafka."""
     body_raw: bytes = request.scope.get("_cached_body") or getattr(request, "_body", b"")
     try:
-        body: dict = json.loads(body_raw.decode("utf-8")) if body_raw else {}
-    except json.JSONDecodeError:
+        body = json.loads(body_raw.decode("utf-8")) if body_raw else {}
+    except ValueError:
+        # not JSON (multipart, binary): the body is not replayed
+        body = {}
+    if not isinstance(body, dict | list) or (
+        isinstance(body, list) and not all(isinstance(it, dict) for it in body)
+    ):
         body = {}
 
     headers: list[tuple[str, str]] = []

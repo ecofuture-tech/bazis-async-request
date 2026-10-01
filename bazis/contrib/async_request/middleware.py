@@ -33,6 +33,16 @@ from .utils import build_request_payload, is_internal_request
 logger = logging.getLogger(__name__)
 
 
+def partition_marker(body) -> str | None:
+    """
+    The id of the JSON:API resource of the body: the requests of one resource are kept in
+    one Kafka partition, in order.
+    """
+    data = body.get("data") if isinstance(body, dict) else None
+    item_id = data.get("id") if isinstance(data, dict) else None
+    return str(item_id) if item_id is not None else None
+
+
 class AsyncRequestMiddleware:
     def __init__(self, app):
         self.app = app
@@ -88,9 +98,7 @@ class AsyncRequestMiddleware:
             topic_name=settings.KAFKA_TOPIC_ASYNC_BG,
             channel_name=channel_name,
             payload=payload,
-            partition_marker=(
-                payload.body.get("data", {}).get("id") if isinstance(payload.body, dict) else None
-            ),
+            partition_marker=partition_marker(payload.body),
         )
 
         response = JSONResponse(
