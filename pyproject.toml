@@ -43,7 +43,8 @@ test = [
     # the sample project
     "bazis-users>=2.3.0",
     "bazis-author>=2.3.0",
-    "bazis-permit>=2.3.0",
+    # an item the user does not view is not found (404)
+    "bazis-permit>=2.8.0",
     "bazis-ws>=2.3.0",
 ]
 dev = [

@@ -43,7 +43,8 @@ response_paragon = {'endpoint': '/api/v1/fast_start/order/e7cc4c8c-3ed1-4576-96a
 def test_manager_patch_order(create_test_data, sample_app):
     _, manager, _, buyer_2, order = create_test_data
 
-    # The delivery manager cannot edit an order that is in draft status
+    # The delivery manager does not see an order that is in draft status: it is not found
+    # for him (bazis-permit 2.8), as a missing one
     order.status = OrderStatus.DRAFT
     order.save()
     response = get_api_client(sample_app, manager.jwt_build()).patch(
@@ -57,13 +58,13 @@ def test_manager_patch_order(create_test_data, sample_app):
             }
         },
     )
-    assert response.status_code == 403
+    assert response.status_code == 404
     response_data = response.json()
     assert normalize(response_data) == {
         "errors": [
             {
-                "detail": "Permission denied: check access",
-                "status": 403,
+                "detail": "Item not found",
+                "status": 404,
             }
         ]
     }
@@ -93,7 +94,7 @@ def test_manager_patch_order(create_test_data, sample_app):
 def test_manager_patch_order_async(create_test_data, sample_app, process_async_response):
     _, manager, _, buyer_2, order = create_test_data
 
-    # The delivery manager cannot edit an order that is in draft status
+    # The delivery manager does not see an order that is in draft status: not found
     order.status = OrderStatus.DRAFT
     order.save()
     response = get_api_client(sample_app, manager.jwt_build()).patch(
@@ -118,28 +119,27 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     response_paragon["task_id"] = task_id
 
     # checking the result written by the consumer to Redis
-    paragon_403 = {
+    paragon_404 = {
         "endpoint": f"/api/v1/fast_start/order/{order.id}/",
         "headers": [
-            ["content-length", "4741"],
             ["content-type", "application/json"]
         ],
         "response": {
             "errors": [
                 {
-                    "detail": "Permission denied: check access",
-                    "status": 403
+                    "detail": "Item not found",
+                    "status": 404
                 }
             ]
         },
-        "status": 403,
+        "status": 404,
         "task_id": task_id
     }
 
     result_in_redis = process_async_response(task_id)
     response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
     del response_data["response"]["errors"][0]["traceback"]
-    assert normalize(response_data) == normalize(paragon_403)
+    assert normalize(response_data) == normalize(paragon_404)
 
     # retrieving background task results via the endpoint by id_task
     response = get_api_client(sample_app, manager.jwt_build()).get(
@@ -148,7 +148,7 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     assert response.status_code == 200
     response_data = response.json()
     del response_data["response"]["errors"][0]["traceback"]
-    assert normalize(response_data) == normalize(paragon_403)
+    assert normalize(response_data) == normalize(paragon_404)
 
     # The delivery manager can edit an order that is in in_progress status
     order.status = OrderStatus.IN_PROGRESS
