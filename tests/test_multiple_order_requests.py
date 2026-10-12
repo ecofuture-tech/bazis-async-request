@@ -25,6 +25,8 @@ that is, that starting several consumers in several processes and their parallel
 topic is performed successfully without causing any errors.
 """
 
+from django.contrib.auth import get_user_model
+
 import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import Order, OrderStatus
@@ -34,8 +36,12 @@ from bazis.contrib.async_background.testing import wait_for_task
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_manager_patch_order_async(create_test_data, sample_app):
-    shop, manager, _, buyer_2, order = create_test_data
+def test_manager_patch_order_async(create_test_data, fast_start_setup_groups_and_roles, sample_app):
+    shop, _, _, buyer_2, order = create_test_data
+    # the description of an order in progress is changed by the support, not by the manager
+    # of the shop, whose role disables the field (bazis-permit 2.11 with bazis 2.16)
+    manager = get_user_model().objects.create_user("support", email="s@site.com", password="pass")
+    manager.roles.add(fast_start_setup_groups_and_roles["support_1_line"])
 
     # Create a topic with 15 partitions
     # Create 15 shops
