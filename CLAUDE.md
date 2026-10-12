@@ -32,8 +32,8 @@ python -m pytest ../tests -o addopts="--reuse-db" -p no:cacheprovider
 ```
 
 The tests and the consumer share one database (`sample/sample/settings.py` sets `TEST.NAME`
-to the database name): migrate it first (`python manage.py migrate` and
-`python manage.py pgtrigger install` in `sample`), start a consumer with the same variables
+to the database name): migrate it first (`python manage.py migrate` in `sample`; the
+pytest plugin of bazis-test-utils installs the triggers), start a consumer with the same variables
 (`python manage.py kafka_consumer_single &`) and run pytest with `-o addopts="--reuse-db"`.
 The tests marked `run_with_consumer` are skipped without Kafka settings. A local Kafka
 without Docker: download the Kafka binaries and start a single KRaft node.

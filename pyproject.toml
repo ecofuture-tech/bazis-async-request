@@ -39,7 +39,8 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "bazis-test-utils>=2.3.0",
+    # the plugin installs the triggers of the test database
+    "bazis-test-utils>=2.5.0",
     # the helpers of the tests (bazis.contrib.async_background.testing)
     "bazis-async-background>=2.5.0",
     # the sample project

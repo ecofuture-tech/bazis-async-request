@@ -113,7 +113,6 @@ jobs:
         working-directory: sample
         run: |
           python manage.py migrate -v0
-          python manage.py pgtrigger install
 
       - name: Start a Kafka consumer
         working-directory: sample

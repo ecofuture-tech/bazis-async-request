@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from django.contrib.auth import get_user_model
-from django.core.management import call_command
 
 import pytest
 from translated_fields import to_attribute
@@ -25,12 +24,6 @@ from bazis.contrib.async_background.testing import (  # noqa: F401
     pytest_collection_modifyitems,
     wait_for_tasks,
 )
-
-
-@pytest.fixture(scope="session")
-def django_db_setup(django_db_setup, django_db_blocker) -> None:
-    with django_db_blocker.unblock():
-        call_command("pgtrigger", "install")
 
 
 @pytest.fixture(scope="function")
