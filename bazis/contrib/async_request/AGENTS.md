@@ -39,8 +39,8 @@ router.register('bazis.contrib.async_background.router')    # async_request.E001
   bazis-ws (16–128 characters `A-Z a-z 0-9 _ -`). Without a valid token: 401. The request
   is replayed with the same header: routes that read the user (bazis-users, permit, author)
   answer 401 to an anonymous token, so use it only for routes that do not.
-- Answer: 202 `{"data": null, "meta": {"async_request_id": <id>, "async_background_id": <id>}}`
-  (the same task id). Status updates arrive on the WebSocket channel of the token.
+- Answer: 202 `{"data": null, "meta": {"async_request_id": <id>}}` (the task id).
+  Status updates arrive on the WebSocket channel of the token.
 - Result: `GET .../async_background_response/{task_id}/` with the same token returns
   `{"task_id", "endpoint", "status", "headers", "response"}` of the replayed request
   (an HTTP error is a `completed` task with its status); `{"status": "not ready"}` before.

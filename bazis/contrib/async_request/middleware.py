@@ -102,10 +102,6 @@ class AsyncRequestMiddleware:
         )
 
         response = JSONResponse(
-            status_code=202,
-            content={"data": None, "meta": {
-                "async_request_id": message.task_id,
-                "async_background_id": message.task_id,
-            }},
+            status_code=202, content={"data": None, "meta": {"async_request_id": message.task_id}}
         )
         await response(scope, receive, send)
