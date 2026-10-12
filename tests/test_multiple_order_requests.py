@@ -25,14 +25,11 @@ that is, that starting several consumers in several processes and their parallel
 topic is performed successfully without causing any errors.
 """
 
-import json
-import time
-
 import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import Order, OrderStatus
 
-from bazis.contrib.async_background.utils import redis, task_key
+from bazis.contrib.async_background.testing import wait_for_task
 
 
 @pytest.mark.run_with_consumer
@@ -74,20 +71,9 @@ def test_manager_patch_order_async(create_test_data, sample_app):
     # Check the statuses of the last (10th) background patch for each order.
     # Check that the current value for each order corresponds to the last (10th) patch.
 
-    # Check the result written by the consumer to Redis
-    for _ in range(180):
-        processed = 0
-        for order_i in range(0, 15):
-            if redis_data := redis.get(task_key(tasks[order_i])):
-                data_dict = json.loads(redis_data.decode("utf-8"))
-                if data_dict["status"] == "completed":
-                    processed += 1
-        if processed == 15:
-            break
-        else:
-            time.sleep(1)
-    else:
-        pytest.fail(f"Message processing incomplete: only {processed} of 15 messages processed")
+    # Wait for the results written by the consumer to Redis
+    for order_i in range(0, 15):
+        wait_for_task(tasks[order_i], timeout=180)
 
     # Retrieve the results of background tasks by id_task via the endpoint
     for order_i in range(0, 15):

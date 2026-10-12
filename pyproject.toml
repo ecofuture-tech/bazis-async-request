@@ -40,6 +40,8 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "bazis-test-utils>=2.3.0",
+    # the helpers of the tests (bazis.contrib.async_background.testing)
+    "bazis-async-background>=2.5.0",
     # the sample project
     "bazis-users>=2.3.0",
     "bazis-author>=2.3.0",

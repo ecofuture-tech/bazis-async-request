@@ -24,6 +24,7 @@ import time
 import pytest
 from bazis_test_utils.utils import get_api_client
 
+from bazis.contrib.async_background.testing import wait_for_task
 from bazis.contrib.ws.models_abstract import redis
 
 from tests.utils import normalize
@@ -65,7 +66,7 @@ def test_wo_token(sample_app):
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_async_decorator(create_test_data, sample_app, process_async_response):
+def test_async_decorator(create_test_data, sample_app):
     _, manager, _, _, _ = create_test_data
 
     channel_name = manager.user_channel
@@ -106,8 +107,7 @@ def test_async_decorator(create_test_data, sample_app, process_async_response):
     response_paragon["task_id"] = task_id
 
     # Check the result written to Redis by the consumer
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     assert normalize(response_data) == normalize(response_paragon)
 
     # Wait for the Redis subscriber to finish
@@ -132,7 +132,7 @@ def test_async_decorator(create_test_data, sample_app, process_async_response):
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_sync_decorator(create_test_data, sample_app, process_async_response):
+def test_sync_decorator(create_test_data, sample_app):
 
 
     _, manager, _, _, _ = create_test_data
@@ -186,9 +186,8 @@ def test_sync_decorator(create_test_data, sample_app, process_async_response):
     response_paragon["task_id"] = task_id
 
     # Check the result written to Redis by the consumer
-    logger.info("test_sync_decorator: waiting for process_async_response")
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    logger.info("test_sync_decorator: waiting for the task")
+    response_data = wait_for_task(task_id)["response"]
     response_paragon["endpoint"] = '/api/v1/some-sync-endpoint/'
     assert normalize(response_data) == normalize(response_paragon)
 

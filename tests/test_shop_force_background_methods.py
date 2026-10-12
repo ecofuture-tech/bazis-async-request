@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 
 import pytest
 from bazis_test_utils.utils import get_api_client
 
+from bazis.contrib.async_background.testing import wait_for_task
+
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_async_patch_shop_name_only(create_test_data, sample_app, process_async_response):
+def test_async_patch_shop_name_only(create_test_data, sample_app):
     shop, manager, *_ = create_test_data
 
     # Asynchronous PATCH: change the name
@@ -43,8 +44,7 @@ def test_async_patch_shop_name_only(create_test_data, sample_app, process_async_
     assert response.json()["meta"]["async_request_id"] == task_id
 
     # Processing by the consumer
-    redis_result = process_async_response(task_id)
-    response_data = json.loads(redis_result.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     assert response_data["response"]["data"]["id"] == str(shop.id)
     assert response_data["response"]["data"]["attributes"]["name"] == "Shop 1 Updated"
 

@@ -16,11 +16,12 @@
 Checking patch requests.
 """
 
-import json
 
 import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import OrderStatus
+
+from bazis.contrib.async_background.testing import wait_for_task
 
 from tests.utils import normalize
 
@@ -91,7 +92,7 @@ def test_manager_patch_order(create_test_data, sample_app):
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_manager_patch_order_async(create_test_data, sample_app, process_async_response):
+def test_manager_patch_order_async(create_test_data, sample_app):
     _, manager, _, buyer_2, order = create_test_data
 
     # The delivery manager does not see an order that is in draft status: not found
@@ -136,8 +137,7 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
         "task_id": task_id
     }
 
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     del response_data["response"]["errors"][0]["traceback"]
     assert normalize(response_data) == normalize(paragon_404)
 
@@ -177,8 +177,7 @@ def test_manager_patch_order_async(create_test_data, sample_app, process_async_r
     response_paragon["endpoint"] = f"/api/v1/fast_start/order/{order.id}/"
 
     # checking the result written by the consumer to Redis
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     assert normalize(response_data) == normalize(response_paragon)
 
     # retrieving background task results via the endpoint by id_task

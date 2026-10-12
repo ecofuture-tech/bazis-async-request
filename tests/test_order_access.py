@@ -16,10 +16,11 @@
 Checking access to the results of background tasks.
 """
 
-import json
 
 import pytest
 from bazis_test_utils.utils import get_api_client
+
+from bazis.contrib.async_background.testing import wait_for_task
 
 from tests.utils import normalize
 
@@ -55,7 +56,7 @@ response_paragon_empty = {
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_access_segregation(create_test_data, sample_app, process_async_response):
+def test_access_segregation(create_test_data, sample_app):
     _, manager, _, buyer_2, order = create_test_data
 
     ### the manager receives the list of orders with the order of buyer 1
@@ -73,8 +74,7 @@ def test_access_segregation(create_test_data, sample_app, process_async_response
     response_paragon["task_id"] = task_id
 
     # checking the result written by the consumer to Redis
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     assert normalize(response_data) == normalize(response_paragon)
 
     # getting the results of background tasks by id_task via the endpoint

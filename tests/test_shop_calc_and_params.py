@@ -22,6 +22,8 @@ import pytest
 from bazis_test_utils.utils import get_api_client
 from fast_start.models import Order, OrderStatus, Shop
 
+from bazis.contrib.async_background.testing import wait_for_task
+
 from tests.utils import normalize
 
 
@@ -65,7 +67,7 @@ response_paragon_empty = {
 
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
-def test_calc_and_params(create_test_data, sample_app, process_async_response):
+def test_calc_and_params(create_test_data, sample_app):
     shop, manager, _, buyer_2, order = create_test_data
 
     # the manager gets the list of shops without restrictions because PermitRouteBase is not selected and no roles are checked
@@ -162,7 +164,7 @@ def test_calc_and_params(create_test_data, sample_app, process_async_response):
     assert response_data["meta"]["async_request_id"] == task_id
 
     # executing the task by the consumer
-    process_async_response(task_id)
+    wait_for_task(task_id)
 
     # getting the results of background tasks by id_task via the endpoint
     response = get_api_client(sample_app, manager.jwt_build()).get(

@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import time
-
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
 import pytest
 from translated_fields import to_attribute
+
+# the tests marked `run_with_consumer` need Kafka and a running consumer
+# (`python manage.py kafka_consumer_single` in `sample`, see CLAUDE.md)
+from bazis.contrib.async_background.testing import (  # noqa: F401
+    delete_tasks,
+    pytest_collection_modifyitems,
+    wait_for_tasks,
+)
 
 
 @pytest.fixture(scope="session")
@@ -155,23 +160,6 @@ def fast_start_setup_groups_and_roles(db):
 
 
 @pytest.fixture
-def process_async_response():
-    from bazis.contrib.async_background.utils import redis, task_key
-
-    def _run(task_id: str, timeout: int = 45) -> bytes:
-        # Wait for status "completed" (processed by external consumer)
-        for _ in range(timeout):
-            if redis_data := redis.get(task_key(task_id)):
-                data_dict = json.loads(redis_data.decode("utf-8"))
-                if data_dict.get("status") == "completed":
-                    return redis_data
-            time.sleep(1)
-        pytest.fail(f"Timeout waiting for async_background_response for task_id={task_id}")
-
-    return _run
-
-
-@pytest.fixture
 def create_test_data(fast_start_setup_groups_and_roles):
     user = get_user_model()
     from fast_start.models import Order, OrderStatus, Shop
@@ -212,33 +200,6 @@ def wait_for_background_tasks(request):
     while the consumer still executes one of its tasks.
     """
     yield
-    if "run_with_consumer" not in request.keywords:
-        return
-    from bazis.contrib.async_background.utils import TASK_KEY_PREFIX, redis
-
-    for _ in range(60):
-        statuses = {
-            json.loads(value)["status"]
-            for key in redis.scan_iter(f"{TASK_KEY_PREFIX}*")
-            if (value := redis.get(key))
-        }
-        if not statuses - {"completed", "failed"}:
-            break
-        time.sleep(0.5)
-    for key in redis.scan_iter(f"{TASK_KEY_PREFIX}*"):
-        redis.delete(key)
-
-
-def pytest_collection_modifyitems(config, items):
-    """
-    The tests marked `run_with_consumer` need Kafka and a running consumer
-    (`python manage.py kafka_consumer_single` in `sample`, see CLAUDE.md).
-    """
-    from django.conf import settings
-
-    if settings.KAFKA_ENABLED:
-        return
-    skip = pytest.mark.skip(reason="Kafka is not configured (BS_KAFKA_BOOTSTRAP_SERVERS)")
-    for item in items:
-        if "run_with_consumer" in item.keywords:
-            item.add_marker(skip)
+    if "run_with_consumer" in request.keywords:
+        wait_for_tasks()
+        delete_tasks()

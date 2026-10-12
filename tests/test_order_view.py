@@ -23,6 +23,7 @@ import time
 import pytest
 from bazis_test_utils.utils import get_api_client
 
+from bazis.contrib.async_background.testing import wait_for_task
 from bazis.contrib.ws.models_abstract import redis
 
 from tests.utils import normalize
@@ -79,7 +80,7 @@ def test_manager_see_order_not_other_buyer(create_test_data, sample_app):
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
 def test_manager_see_order_not_other_buyer_async(
-        create_test_data, sample_app, process_async_response
+        create_test_data, sample_app
 ):
     _, manager, _, buyer_2, order = create_test_data
 
@@ -123,8 +124,7 @@ def test_manager_see_order_not_other_buyer_async(
     response_paragon["task_id"] = task_id
 
     # check the result written by the consumer into Redis
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     assert normalize(response_data) == normalize(response_paragon)
 
     # Wait for the Redis subscriber to finish
@@ -158,8 +158,7 @@ def test_manager_see_order_not_other_buyer_async(
     assert response_data["meta"]["async_request_id"] == task_id
 
     # check the result written by the consumer into Redis
-    result_in_redis = process_async_response(task_id)
-    response_data = json.loads(result_in_redis.decode("utf-8"))["response"]
+    response_data = wait_for_task(task_id)["response"]
     assert len(response_data["response"]["data"]) == 0
 
     # retrieve background task results by task_id via the endpoint
