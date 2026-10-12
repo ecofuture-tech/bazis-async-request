@@ -24,10 +24,9 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 
 from bazis.contrib.async_background.producer import enqueue_task_async
-from bazis.contrib.async_background.routes import get_async_background_response
 from bazis.contrib.async_background.utils import ChannelNameError, resolve_channel_name_async
 
-from .utils import build_request_payload, is_internal_request
+from .utils import build_request_payload, is_internal_request, results_route_prefix
 
 
 logger = logging.getLogger(__name__)
@@ -46,29 +45,18 @@ def partition_marker(body) -> str | None:
 class AsyncRequestMiddleware:
     def __init__(self, app):
         self.app = app
-        self._no_bg_prefixes: tuple[str, ...] | None = None
-
-    def _build_no_bg_prefixes(self, app) -> tuple[str, ...]:
-        prefixes: list[str] = []
-        path = app.url_path_for(get_async_background_response.__name__, task_id="__dummy__")
-        if path:
-            prefix = str(path).replace("/__dummy__/", "/")
-            while "//" in prefix:
-                prefix = prefix.replace("//", "/")
-            prefixes.append(prefix)
-        return tuple(prefixes)
+        #: the prefix of the route of the results, resolved at the first request (the routes
+        #: are registered after the middleware)
+        self._results_prefix: str | None = None
 
     async def __call__(self, scope, receive, send) -> None:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
-        if self._no_bg_prefixes is None:
-            scope_app = scope.get("app")
-            self._no_bg_prefixes = self._build_no_bg_prefixes(scope_app or self.app)
-
-        path = scope.get("path", "")
-        if self._no_bg_prefixes and any(path.startswith(prefix) for prefix in self._no_bg_prefixes):
+        if self._results_prefix is None:
+            self._results_prefix = results_route_prefix(scope.get("app") or self.app)
+        if scope.get("path", "").startswith(self._results_prefix):
             await self.app(scope, receive, send)
             return
 

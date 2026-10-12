@@ -56,8 +56,10 @@ def check_response_route(app_configs, **kwargs):
 
     from starlette.routing import NoMatchFound
 
+    from .utils import results_route_prefix
+
     try:
-        app.url_path_for('get_async_background_response', task_id='__dummy__')
+        results_route_prefix(app)
     except NoMatchFound:
         return [
             Error(

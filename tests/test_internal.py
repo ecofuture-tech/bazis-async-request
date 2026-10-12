@@ -164,3 +164,18 @@ def test_partition_marker(body, marker):
     from bazis.contrib.async_request.middleware import partition_marker
 
     assert partition_marker(body) == marker
+
+
+def test_the_results_route_is_never_queued(sample_app):
+    """
+    A request of the route of the results is answered at once, also with the header that
+    queues the requests.
+    """
+    response = get_api_client(sample_app).get(
+        "/api/v1/async_background_response/missing-task/",
+        headers={
+            "X-Async-Background": "true",
+            "Authorization": "Bearer anonymous-token-0123456789",
+        },
+    )
+    assert response.status_code == 404

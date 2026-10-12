@@ -26,6 +26,16 @@ logger = logging.getLogger(__name__)
 SCOPE_INTERNAL_KEY = "bazis_async_request_internal"
 
 
+def results_route_prefix(app) -> str:
+    """
+    The path prefix of the route of the results (`get_async_background_response` of
+    bazis-async-background), whose requests are never queued. Raises `NoMatchFound` if the
+    route is not registered (`async_request.E001`).
+    """
+    path = app.url_path_for("get_async_background_response", task_id="__dummy__")
+    return str(path).removesuffix("__dummy__/")
+
+
 def is_internal_request(scope) -> bool:
     """
     Whether the request is executed by the consumer of async requests.
