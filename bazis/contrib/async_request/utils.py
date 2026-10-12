@@ -46,10 +46,12 @@ def build_request_payload(request: Request) -> AsyncRequestPayload:
     ):
         body = {}
 
+    # the replayed request is not queued again: the scope marks it internal, and it does
+    # not carry the header that queued it
     headers: list[tuple[str, str]] = []
     for k, v in request.scope.get("headers", []):
         k_val, v_val = k.decode("latin-1"), v.decode("latin-1")
-        if k_val.lower() not in ("x-async-background", "x-async-background-internal"):
+        if k_val.lower() != "x-async-background":
             headers.append((k_val, v_val))
 
     return AsyncRequestPayload(
@@ -69,8 +71,9 @@ def build_request_payload(request: Request) -> AsyncRequestPayload:
 
 async def require_async(request: Request) -> None:
     """
-    Allows the endpoint only for requests executed in the background. The header
-    `X-Async-Background-Internal` is no longer trusted: any client could send it.
+    Allows the endpoint only for requests executed in the background: the consumer marks
+    them in the ASGI scope (`SCOPE_INTERNAL_KEY`), never trust a header, which any client
+    can send.
     """
     if is_internal_request(request.scope):
         return

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 #: the headers of the original request that do not apply to the replayed request
-SKIPPED_HEADERS = {"content-length", "transfer-encoding", "x-async-background"}
+SKIPPED_HEADERS = {"content-length", "transfer-encoding"}
 
 
 @get_broker_for_consumer().subscriber(settings.KAFKA_TOPIC_ASYNC_BG, **subscriber_kwargs())
@@ -84,7 +84,8 @@ async def execute_internal_request(task: KafkaTask[AsyncRequestPayload]) -> dict
         "method": request.method,
         "scheme": request.scheme,
         "root_path": request.root_path,
-        # the stored path is already decoded (requests stored by 2.2 too)
+        # the stored path is already decoded; `raw_path` is optional in ASGI: a server that
+        # does not set it leaves the decoded path
         "path": request.path,
         "raw_path": (
             request.raw_path.encode("latin-1")
