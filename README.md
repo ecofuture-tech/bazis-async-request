@@ -187,7 +187,7 @@ BS_KAFKA_TASKS='["bazis.contrib.async_request.tasks"]'
 - `KAFKA_LOG_LEVEL` — log level for consumers
 - `BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER` — dotted path of a `callable(payload) -> str` that
   chooses the topic of each request (default: `KAFKA_TOPIC_ASYNC_BG`); serve every
-  returned topic with `tasks.consumer_for_topic(topic)` in a `KAFKA_TASKS` module (see
+  returned topic with `consumers.consumer_for_topic(topic)` in a `KAFKA_TASKS` module (see
   "Several topics" in `AGENTS.md`)
 
 ### Route Registration

@@ -34,8 +34,8 @@ use_when = "the consumer of the requests: list bazis.contrib.async_request.tasks
 
 [[extension_points]]
 name = "consumer_for_topic"
-import = "bazis.contrib.async_request.tasks.consumer_for_topic"
-use_when = "a consumer of one more topic chosen by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER, in a module listed in KAFKA_TASKS"
+import = "bazis.contrib.async_request.consumers.consumer_for_topic"
+use_when = "a consumer of a topic chosen by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER, in a module listed in KAFKA_TASKS (the module consumers registers nothing when imported, unlike tasks)"
 
 [[pitfalls]]
 text = "without Kafka settings the requests with X-Async-Background are executed synchronously"
@@ -48,6 +48,9 @@ check = "async_request.E001"
 [[pitfalls]]
 text = "BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER must import to a callable(payload) -> str, or every request with X-Async-Background fails"
 check = "async_request.E002"
+
+[[pitfalls]]
+text = "the resolver runs in the event loop for every queued request: no ORM or blocking I/O, decide from the payload"
 
 [[pitfalls]]
 text = "a topic returned by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER needs a consumer (consumer_for_topic in a KAFKA_TASKS module), or its requests stay pending"

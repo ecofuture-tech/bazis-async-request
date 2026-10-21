@@ -15,13 +15,15 @@
 """
 A second lane of background requests: with BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER set to
 `fast_start.tasks.request_topic`, the requests of the shops go to their own Kafka topic,
-served by `consumer_shops` (the module is listed in KAFKA_TASKS).
+served by `consumer_shops` (the module is listed in KAFKA_TASKS). The module does not
+import `bazis.contrib.async_request.tasks`: a consumer process that lists only this module
+serves only the topic of the shops.
 """
 
 from django.conf import settings
 
+from bazis.contrib.async_request.consumers import consumer_for_topic
 from bazis.contrib.async_request.schemas import AsyncRequestPayload
-from bazis.contrib.async_request.tasks import consumer_for_topic
 
 
 SHOPS_TOPIC = f'{settings.KAFKA_TOPIC_ASYNC_BG}_shops'

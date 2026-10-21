@@ -17,16 +17,25 @@ The Kafka topic of a background request chosen by BAZIS_ASYNC_REQUEST_TOPIC_RESO
 the consumers of more topics (`consumer_for_topic`).
 """
 
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from bazis_test_utils.utils import get_api_client
 
+# imported before a test changes the settings: the topic of the shops is the one of the
+# consumer process
+from fast_start.tasks import SHOPS_TOPIC
+
 from bazis.contrib.async_background.testing import wait_for_task
-from bazis.contrib.async_request import middleware
+from bazis.contrib.async_request import checks, middleware, tasks
 from bazis.contrib.async_request.checks import check_topic_resolver
+from bazis.contrib.async_request.consumers import consumer_for_topic
 from bazis.contrib.async_request.schemas import AsyncRequestPayload
-from bazis.contrib.async_request.tasks import consumer_for_topic
 
 
 RESOLVER = 'fast_start.tasks.request_topic'
@@ -39,7 +48,8 @@ def enqueued(settings, monkeypatch):
     The arguments of the queued tasks: the middleware queues them without Kafka.
     """
     settings.KAFKA_ENABLED = True
-    settings.KAFKA_TOPIC_ASYNC_BG = 'sample_async_request'
+    if not settings.KAFKA_TOPIC_ASYNC_BG:
+        settings.KAFKA_TOPIC_ASYNC_BG = 'sample_async_request'
     calls = []
 
     async def enqueue_task_async(**kwargs):
@@ -103,8 +113,6 @@ def test_without_resolver_the_topic_is_kafka_topic_async_bg(
 
 
 def test_resolver_chooses_the_topic(sample_app, settings, enqueued, resolved):
-    from fast_start.tasks import SHOPS_TOPIC
-
     assert queue(sample_app, '/api/v1/fast_start/shop/item-1/').status_code == 202
     assert queue(sample_app, '/api/v1/fast_start/order/item-1/').status_code == 202
 
@@ -142,14 +150,40 @@ def test_an_error_of_the_resolver_is_not_queued(sample_app, settings, monkeypatc
     assert enqueued == []
 
 
-def test_the_resolver_is_called_after_the_authentication(sample_app, enqueued, resolved):
+@pytest.mark.parametrize('token', [None, 'not.a.jwt'])
+def test_the_resolver_is_called_after_the_authentication(sample_app, enqueued, resolved, token):
     """
-    A request without a valid token is answered 401 before its topic is chosen.
+    A request without a token or with an invalid JWT is answered 401 before its topic is
+    chosen.
     """
-    response = queue(sample_app, '/api/v1/fast_start/shop/item-1/', token=None)
+    response = queue(sample_app, '/api/v1/fast_start/shop/item-1/', token=token)
 
     assert response.status_code == 401
     assert resolved == []
+    assert enqueued == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_an_inactive_user_is_refused_before_the_resolver(
+    create_test_data, sample_app, enqueued, resolved
+):
+    _, manager, *_ = create_test_data
+    token = manager.jwt_build()
+    manager.is_active = False
+    manager.save(update_fields=['is_active'])
+
+    response = queue(sample_app, '/api/v1/fast_start/shop/item-1/', token=token)
+
+    assert response.status_code == 401
+    assert resolved == []
+    assert enqueued == []
+
+
+def test_a_resolver_that_does_not_import_fails_the_request(sample_app, settings, enqueued):
+    settings.BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER = 'fast_start.tasks.missing'
+
+    with pytest.raises(ImportError):
+        queue(sample_app, '/api/v1/fast_start/shop/item-1/')
     assert enqueued == []
 
 
@@ -178,6 +212,84 @@ def test_topic_resolver_check(settings, path, errors):
     assert [it.id for it in check_topic_resolver(None)] == errors
 
 
+def test_topic_resolver_check_of_a_module_that_fails(settings, monkeypatch):
+    """
+    The module of the resolver fails with any error when imported: the check reports it.
+    """
+
+    def import_string(path):
+        raise RuntimeError('broken module')
+
+    monkeypatch.setattr(checks, 'import_string', import_string)
+    settings.BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER = RESOLVER
+
+    errors = check_topic_resolver(None)
+
+    assert [it.id for it in errors] == ['async_request.E002']
+    assert 'broken module' in errors[0].msg
+
+
+def test_tasks_keeps_the_names_of_the_consumer():
+    assert tasks.consumer_for_topic is consumer_for_topic
+    assert callable(tasks.execute_internal_request)
+
+
+#: what kafka_consumer_single does before it starts the broker, then the topics of the
+#: subscribers before and after importing bazis.contrib.async_request.tasks
+CONSUMER_TOPICS_SCRIPT = """
+import json
+
+import django
+
+django.setup()
+
+from django.conf import settings
+
+from bazis.contrib.async_background.broker import get_broker_for_consumer
+from bazis.core.app import app  # noqa: F401
+from bazis.core.router import router  # noqa: F401
+
+
+def topics():
+    return sorted(topic for it in get_broker_for_consumer().subscribers for topic in it.topics)
+
+
+for task_path in settings.KAFKA_TASKS:
+    __import__(task_path)
+listed = topics()
+__import__('bazis.contrib.async_request.tasks')
+print(json.dumps([listed, topics()]))
+"""
+
+
+def test_a_consumer_of_the_project_lane_only():
+    """
+    A consumer process whose KAFKA_TASKS lists only the module of a lane serves only its
+    topic: the module of the consumer (`consumers`) registers no subscriber when imported,
+    unlike `tasks`.
+    """
+    import fast_start
+
+    env = {
+        **os.environ,
+        'DJANGO_SETTINGS_MODULE': 'sample.settings',
+        'BS_KAFKA_TASKS': '["fast_start.tasks"]',
+        'BS_KAFKA_TOPIC_ASYNC_BG': 'lane_test',
+    }
+    result = subprocess.run(
+        [sys.executable, '-c', CONSUMER_TOPICS_SCRIPT],
+        cwd=Path(fast_start.__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    listed, with_tasks = json.loads(result.stdout.strip().splitlines()[-1])
+    assert listed == ['lane_test_shops']
+    assert with_tasks == ['lane_test', 'lane_test_shops']
+
+
 @pytest.mark.run_with_consumer
 @pytest.mark.django_db(transaction=True)
 def test_two_topics_are_served(create_test_data, sample_app, settings, monkeypatch):
@@ -186,8 +298,6 @@ def test_two_topics_are_served(create_test_data, sample_app, settings, monkeypat
     (`fast_start.tasks`): the update of a shop, allowed only to the requests replayed by a
     consumer, is executed from its own topic.
     """
-    from fast_start.tasks import SHOPS_TOPIC
-
     shop, manager, buyer_1, _, order = create_test_data
     settings.BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER = RESOLVER
     topics = []

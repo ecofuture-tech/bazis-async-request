@@ -60,7 +60,7 @@ BS_KAFKA_TASKS='["bazis.contrib.async_request.tasks", "myproject.async_lanes"]'
 ```python
 # myproject/async_lanes.py
 from django.conf import settings
-from bazis.contrib.async_request.tasks import consumer_for_topic
+from bazis.contrib.async_request.consumers import consumer_for_topic
 
 def request_topic(payload) -> str:          # payload.path, method, headers, body
     if payload.path.startswith('/api/v1/reports/'):
@@ -74,8 +74,14 @@ consumer_reports = consumer_for_topic(settings.MYPROJECT_TOPIC_REPORTS)
   logic of `consumer_async_requests` in the module listed in `KAFKA_TASKS`. The package
   cannot see the topics of the resolver: a topic without a consumer leaves its tasks
   `pending`.
-- Importing `bazis.contrib.async_request.tasks` registers the consumer of
-  `KAFKA_TOPIC_ASYNC_BG` too: every consumer process serves the default topic.
+- `KAFKA_TASKS` of a consumer process chooses its topics: importing
+  `bazis.contrib.async_request.tasks` registers the consumer of `KAFKA_TOPIC_ASYNC_BG`,
+  importing `bazis.contrib.async_request.consumers` registers nothing. A process with
+  `BS_KAFKA_TASKS='["myproject.async_lanes"]'` serves only the topic of the lane, if the
+  module does not import `tasks`.
+- The resolver is synchronous and runs in the event loop of the application, for every
+  queued request: decide from the payload only, without the ORM (Django raises
+  `SynchronousOnlyOperation`) or other blocking I/O.
 - A resolver that raises or returns anything but a non-empty string fails the request
   (500) and queues nothing; a path that does not import is `async_request.E002`.
 - With `BS_BAZIS_CONFIG_APPS` (`BS_BAZIS_APPS`) set, list `bazis.contrib.async_request`

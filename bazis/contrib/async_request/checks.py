@@ -85,7 +85,8 @@ def check_topic_resolver(app_configs, **kwargs):
 
     try:
         resolver = import_string(resolver_path)
-    except ImportError as err:
+    # importing the module of the project can fail with any error
+    except Exception as err:
         problem = f'cannot be imported ({err})'
     else:
         if callable(resolver):
