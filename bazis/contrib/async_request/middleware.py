@@ -26,6 +26,7 @@ from starlette.responses import JSONResponse
 
 from bazis.contrib.async_background.producer import enqueue_task_async
 from bazis.contrib.async_background.utils import ChannelNameError, resolve_channel_name_async
+from bazis.contrib.ws.utils import ANONYMOUS_CHANNEL_PREFIX
 
 from .schemas import AsyncRequestPayload
 from .utils import build_request_payload, is_internal_request, results_route_prefix
@@ -95,6 +96,16 @@ class AsyncRequestMiddleware:
             channel_name = await resolve_channel_name_async(request)
         except ChannelNameError as err:
             response = JSONResponse(status_code=401, content={'detail': str(err)})
+            await response(scope, receive, send)
+            return
+        # the setting is missing if BS_BAZIS_CONFIG_APPS (BS_BAZIS_APPS) does not list the package
+        if channel_name.startswith(ANONYMOUS_CHANNEL_PREFIX) and not getattr(
+            settings, "BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS", True
+        ):
+            response = JSONResponse(
+                status_code=401,
+                content={'detail': 'Background requests require the token of a user.'},
+            )
             await response(scope, receive, send)
             return
 

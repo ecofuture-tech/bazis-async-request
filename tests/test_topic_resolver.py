@@ -13,8 +13,9 @@
 # limitations under the License.
 
 """
-The Kafka topic of a background request chosen by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER, and
-the consumers of more topics (`consumer_for_topic`).
+The Kafka topic of a background request chosen by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER, the
+token checked before it is chosen (BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS), and the consumers
+of more topics (`consumer_for_topic`).
 """
 
 import json
@@ -36,6 +37,7 @@ from bazis.contrib.async_request import checks, middleware, tasks
 from bazis.contrib.async_request.checks import check_topic_resolver
 from bazis.contrib.async_request.consumers import consumer_for_topic
 from bazis.contrib.async_request.schemas import AsyncRequestPayload
+from bazis.contrib.ws.utils import ANONYMOUS_CHANNEL_PREFIX
 
 
 RESOLVER = 'fast_start.tasks.request_topic'
@@ -163,10 +165,57 @@ def test_the_resolver_is_called_after_the_authentication(sample_app, enqueued, r
     assert enqueued == []
 
 
+@pytest.mark.parametrize('allow', ['missing', True])
+def test_anonymous_tokens_are_queued_by_default(sample_app, settings, enqueued, allow):
+    """
+    Without the setting (or without the settings of the package) an anonymous token is
+    queued to its own channel, as in 2.6.0.
+    """
+    if allow == 'missing':
+        del settings.BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS
+    else:
+        settings.BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS = allow
+
+    response = queue(sample_app, '/api/v1/fast_start/shop/item-1/')
+
+    assert response.status_code == 202
+    channel_name = f'{ANONYMOUS_CHANNEL_PREFIX}{ANONYMOUS_TOKEN}'
+    assert [it['channel_name'] for it in enqueued] == [channel_name]
+
+
+def test_anonymous_tokens_are_refused_before_the_resolver(
+    sample_app, settings, enqueued, resolved
+):
+    settings.BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS = False
+
+    response = queue(sample_app, '/api/v1/fast_start/shop/item-1/')
+
+    assert response.status_code == 401
+    assert response.json() == {'detail': 'Background requests require the token of a user.'}
+    assert resolved == []
+    assert enqueued == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_user_token_is_queued_without_anonymous_tokens(
+    create_test_data, sample_app, settings, enqueued, resolved
+):
+    _, manager, *_ = create_test_data
+    settings.BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS = False
+
+    response = queue(sample_app, '/api/v1/fast_start/shop/item-1/', token=manager.jwt_build())
+
+    assert response.status_code == 202
+    assert len(resolved) == 1
+    assert [it['channel_name'] for it in enqueued] == [manager.user_channel]
+
+
+@pytest.mark.parametrize('allow_anonymous', [True, False])
 @pytest.mark.django_db(transaction=True)
 def test_an_inactive_user_is_refused_before_the_resolver(
-    create_test_data, sample_app, enqueued, resolved
+    create_test_data, sample_app, settings, enqueued, resolved, allow_anonymous
 ):
+    settings.BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS = allow_anonymous
     _, manager, *_ = create_test_data
     token = manager.jwt_build()
     manager.is_active = False

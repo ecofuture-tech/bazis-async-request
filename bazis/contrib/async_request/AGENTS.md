@@ -39,6 +39,12 @@ router.register('bazis.contrib.async_background.router')    # async_request.E001
   bazis-ws (16–128 characters `A-Z a-z 0-9 _ -`). Without a valid token: 401. The request
   is replayed with the same header: routes that read the user (bazis-users, permit, author)
   answer 401 to an anonymous token, so use it only for routes that do not.
+- Any client can make up an anonymous token and queue tasks with it. If the project does
+  not need anonymous background requests, set `BS_BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS=false`:
+  an anonymous token is answered 401 before the topic is chosen and nothing is queued; a
+  session JWT of an active user is queued as before. With `BS_BAZIS_CONFIG_APPS`
+  (`BS_BAZIS_APPS`) set, list `bazis.contrib.async_request` in it, or the setting is
+  ignored (anonymous tokens are queued).
 - Answer: 202 `{"data": null, "meta": {"async_request_id": <id>}}` (the task id).
   Status updates arrive on the WebSocket channel of the token.
 - Result: `GET .../async_background_response/{task_id}/` with the same token returns

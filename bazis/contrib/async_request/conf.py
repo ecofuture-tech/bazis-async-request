@@ -27,6 +27,14 @@ class Settings(BazisSettings):
             'must serve every returned topic (consumers.consumer_for_topic).'
         ),
     )
+    BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS: bool = Field(
+        True,
+        title='Background requests with anonymous tokens',
+        description=(
+            'Whether a request with an anonymous token of bazis-ws is queued; False: only '
+            'the session JWT of an active user is, an anonymous token is answered 401.'
+        ),
+    )
 
 
 settings = Settings()

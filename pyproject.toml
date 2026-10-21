@@ -35,6 +35,8 @@ classifiers = [
 dependencies = [
     "bazis>=2.4.0",
     "bazis-async-background>=2.3.0",
+    # the namespace of the anonymous channels (ANONYMOUS_CHANNEL_PREFIX)
+    "bazis-ws>=2.3.0",
 ]
 
 [project.optional-dependencies]
