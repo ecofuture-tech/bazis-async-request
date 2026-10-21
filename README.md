@@ -189,6 +189,9 @@ BS_KAFKA_TASKS='["bazis.contrib.async_request.tasks"]'
   chooses the topic of each request (default: `KAFKA_TOPIC_ASYNC_BG`); serve every
   returned topic with `consumers.consumer_for_topic(topic)` in a `KAFKA_TASKS` module (see
   "Several topics" in `AGENTS.md`)
+- `BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS` — whether a request with an anonymous token of
+  bazis-ws is queued (default: `true`); `false` answers it 401 before it is queued, so only
+  the session JWT of an active user puts tasks in Kafka
 
 ### Route Registration
 
@@ -319,7 +322,9 @@ curl -X POST \
 
 A client without a user token sends an anonymous token it generated itself (16–128
 characters `A-Z a-z 0-9 _ -`, e.g. a random UUID) as `Authorization: Bearer <token>`; the same
-token subscribes to its WebSocket channel (bazis-ws) and reads the result.
+token subscribes to its WebSocket channel (bazis-ws) and reads the result. Anyone can make up
+such a token: with `BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS=false` the request is answered 401
+and only the session JWT of an active user is queued.
 
 The request is stored in the Kafka topic with all its headers, `Authorization` included, and
 executed later with them: protect the topic accordingly.

@@ -8,6 +8,7 @@ solves = [
     "move slow requests or bulk changes to the background without new endpoints",
     "restrict an endpoint to requests executed in the background",
     "route background requests to several Kafka topics (BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER)",
+    "queue only the requests of authenticated users (BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS=false)",
 ]
 requires = ["bazis", "bazis-async-background"]
 pairs_well = ["bazis-users", "bazis-permit"]
@@ -57,6 +58,9 @@ text = "a topic returned by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER needs a consumer 
 
 [[pitfalls]]
 text = "the middleware is not added automatically: app.add_middleware(AsyncRequestMiddleware)"
+
+[[pitfalls]]
+text = "by default any client queues tasks with an anonymous token it made up: set BAZIS_ASYNC_REQUEST_ALLOW_ANONYMOUS=false to queue only the session JWT of an active user"
 
 [[pitfalls]]
 text = "a header must never mark a request as internal: use is_internal_request(scope)"
