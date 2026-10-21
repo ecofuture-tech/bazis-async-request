@@ -24,7 +24,7 @@ class Settings(BazisSettings):
         description=(
             'Dotted path to a callable(payload: AsyncRequestPayload) -> str that returns the '
             'Kafka topic of a background request; unset: KAFKA_TOPIC_ASYNC_BG. A consumer '
-            'must serve every returned topic (tasks.consumer_for_topic).'
+            'must serve every returned topic (consumers.consumer_for_topic).'
         ),
     )
 
