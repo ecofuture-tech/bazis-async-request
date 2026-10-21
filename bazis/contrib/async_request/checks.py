@@ -18,6 +18,7 @@ Django system checks of bazis-async-request (see `manage.py bazis_doctor`).
 
 from django.conf import settings
 from django.core.checks import Error, Warning, register
+from django.utils.module_loading import import_string
 
 
 @register()
@@ -70,3 +71,31 @@ def check_response_route(app_configs, **kwargs):
             )
         ]
     return []
+
+
+@register()
+def check_topic_resolver(app_configs, **kwargs):
+    """
+    The middleware calls the callable of BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER for every
+    background request: if it cannot be imported, every such request fails.
+    """
+    resolver_path = getattr(settings, 'BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER', None)
+    if not resolver_path:
+        return []
+
+    try:
+        resolver = import_string(resolver_path)
+    except ImportError as err:
+        problem = f'cannot be imported ({err})'
+    else:
+        if callable(resolver):
+            return []
+        problem = 'is not callable'
+    return [
+        Error(
+            f'BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER {resolver_path!r} {problem}: '
+            'every request sent with X-Async-Background fails.',
+            hint='Set the dotted path of a callable(payload: AsyncRequestPayload) -> str.',
+            id='async_request.E002',
+        )
+    ]

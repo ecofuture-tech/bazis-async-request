@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
+from django.utils.module_loading import import_string
 
 from fastapi import Request
 
@@ -26,6 +27,7 @@ from starlette.responses import JSONResponse
 from bazis.contrib.async_background.producer import enqueue_task_async
 from bazis.contrib.async_background.utils import ChannelNameError, resolve_channel_name_async
 
+from .schemas import AsyncRequestPayload
 from .utils import build_request_payload, is_internal_request, results_route_prefix
 
 
@@ -40,6 +42,21 @@ def partition_marker(body) -> str | None:
     data = body.get("data") if isinstance(body, dict) else None
     item_id = data.get("id") if isinstance(data, dict) else None
     return str(item_id) if item_id is not None else None
+
+
+def request_topic(payload: AsyncRequestPayload) -> str:
+    """
+    The Kafka topic of a background request: the topic returned by the callable of
+    BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER, or KAFKA_TOPIC_ASYNC_BG without it.
+    """
+    # the setting is missing if BS_BAZIS_CONFIG_APPS (BS_BAZIS_APPS) does not list the package
+    resolver_path = getattr(settings, "BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER", None)
+    if not resolver_path:
+        return settings.KAFKA_TOPIC_ASYNC_BG
+    topic = import_string(resolver_path)(payload)
+    if not isinstance(topic, str) or not topic:
+        raise ValueError(f"{resolver_path} returned {topic!r} instead of a Kafka topic")
+    return topic
 
 
 class AsyncRequestMiddleware:
@@ -83,7 +100,7 @@ class AsyncRequestMiddleware:
 
         payload = build_request_payload(request)
         message = await enqueue_task_async(
-            topic_name=settings.KAFKA_TOPIC_ASYNC_BG,
+            topic_name=request_topic(payload),
             channel_name=channel_name,
             payload=payload,
             partition_marker=partition_marker(payload.body),

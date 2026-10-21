@@ -32,9 +32,8 @@ logger = logging.getLogger(__name__)
 SKIPPED_HEADERS = {"content-length", "transfer-encoding"}
 
 
-@get_broker_for_consumer().subscriber(settings.KAFKA_TOPIC_ASYNC_BG, **subscriber_kwargs())
-async def consumer_async_requests(task: KafkaTask[AsyncRequestPayload]):
-    """Executes a background HTTP request from Kafka."""
+async def process_async_request(task: KafkaTask[AsyncRequestPayload]):
+    """Executes a background HTTP request from Kafka and stores its result."""
 
     await set_and_publish_status_async(
         task_id=task.task_id,
@@ -60,6 +59,27 @@ async def consumer_async_requests(task: KafkaTask[AsyncRequestPayload]):
             status=TaskStatus.COMPLETED,
             response=response,
         )
+
+
+def consumer_for_topic(topic: str):
+    """
+    Registers a consumer of the background requests of one more Kafka topic (the topics
+    returned by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER), in a module listed in KAFKA_TASKS::
+
+        consumer_reports = consumer_for_topic(settings.MYPROJECT_TOPIC_REPORTS)
+    """
+    # FastStream accepts an empty topic, and None as the topic "None"
+    if not topic:
+        raise ValueError(f"A Kafka topic is required, got {topic!r}")
+    return get_broker_for_consumer().subscriber(topic, **subscriber_kwargs())(
+        process_async_request
+    )
+
+
+#: the consumer of KAFKA_TOPIC_ASYNC_BG, registered when the module is imported
+consumer_async_requests = get_broker_for_consumer().subscriber(
+    settings.KAFKA_TOPIC_ASYNC_BG, **subscriber_kwargs()
+)(process_async_request)
 
 
 async def execute_internal_request(task: KafkaTask[AsyncRequestPayload]) -> dict:

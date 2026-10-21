@@ -7,6 +7,7 @@ summary = "run any HTTP request of the API in the background through Kafka (X-As
 solves = [
     "move slow requests or bulk changes to the background without new endpoints",
     "restrict an endpoint to requests executed in the background",
+    "route background requests to several Kafka topics (BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER)",
 ]
 requires = ["bazis", "bazis-async-background"]
 pairs_well = ["bazis-users", "bazis-permit"]
@@ -31,6 +32,11 @@ name = "consumer_async_requests"
 import = "bazis.contrib.async_request.tasks.consumer_async_requests"
 use_when = "the consumer of the requests: list bazis.contrib.async_request.tasks in KAFKA_TASKS"
 
+[[extension_points]]
+name = "consumer_for_topic"
+import = "bazis.contrib.async_request.tasks.consumer_for_topic"
+use_when = "a consumer of one more topic chosen by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER, in a module listed in KAFKA_TASKS"
+
 [[pitfalls]]
 text = "without Kafka settings the requests with X-Async-Background are executed synchronously"
 check = "async_request.W001"
@@ -38,6 +44,13 @@ check = "async_request.W001"
 [[pitfalls]]
 text = "without the route of bazis.contrib.async_background.router the middleware fails on every HTTP request"
 check = "async_request.E001"
+
+[[pitfalls]]
+text = "BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER must import to a callable(payload) -> str, or every request with X-Async-Background fails"
+check = "async_request.E002"
+
+[[pitfalls]]
+text = "a topic returned by BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER needs a consumer (consumer_for_topic in a KAFKA_TASKS module), or its requests stay pending"
 
 [[pitfalls]]
 text = "the middleware is not added automatically: app.add_middleware(AsyncRequestMiddleware)"
