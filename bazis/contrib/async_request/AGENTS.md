@@ -45,6 +45,48 @@ router.register('bazis.contrib.async_background.router')    # async_request.E001
   `{"task_id", "endpoint", "status", "headers", "response"}` of the replayed request
   (an HTTP error is a `completed` task with its status); `{"status": "not ready"}` before.
 
+## Several topics
+
+All requests go to `KAFKA_TOPIC_ASYNC_BG`. To give a workload its own topic (and
+consumers), set the dotted path of a `callable(payload: AsyncRequestPayload) -> str`; the
+middleware calls it once per request, after the token is checked, and queues the request
+to the returned topic:
+
+```bash
+BS_BAZIS_ASYNC_REQUEST_TOPIC_RESOLVER=myproject.async_lanes.request_topic
+BS_KAFKA_TASKS='["bazis.contrib.async_request.tasks", "myproject.async_lanes"]'
+```
+
+```python
+# myproject/async_lanes.py
+from django.conf import settings
+from bazis.contrib.async_request.consumers import consumer_for_topic
+
+def request_topic(payload) -> str:          # payload.path, method, headers, body
+    if payload.path.startswith('/api/v1/reports/'):
+        return settings.MYPROJECT_TOPIC_REPORTS
+    return settings.KAFKA_TOPIC_ASYNC_BG
+
+consumer_reports = consumer_for_topic(settings.MYPROJECT_TOPIC_REPORTS)
+```
+
+- Every returned topic needs a consumer: `consumer_for_topic(topic)` registers one with the
+  logic of `consumer_async_requests` in the module listed in `KAFKA_TASKS`. The package
+  cannot see the topics of the resolver: a topic without a consumer leaves its tasks
+  `pending`.
+- `KAFKA_TASKS` of a consumer process chooses its topics: importing
+  `bazis.contrib.async_request.tasks` registers the consumer of `KAFKA_TOPIC_ASYNC_BG`,
+  importing `bazis.contrib.async_request.consumers` registers nothing. A process with
+  `BS_KAFKA_TASKS='["myproject.async_lanes"]'` serves only the topic of the lane, if the
+  module does not import `tasks`.
+- The resolver is synchronous and runs in the event loop of the application, for every
+  queued request: decide from the payload only, without the ORM (Django raises
+  `SynchronousOnlyOperation`) or other blocking I/O.
+- A resolver that raises or returns anything but a non-empty string fails the request
+  (500) and queues nothing; a path that does not import is `async_request.E002`.
+- With `BS_BAZIS_CONFIG_APPS` (`BS_BAZIS_APPS`) set, list `bazis.contrib.async_request`
+  in it, or the setting is ignored.
+
 ## Endpoints only for background requests
 
 ```python
