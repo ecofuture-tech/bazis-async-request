@@ -300,7 +300,12 @@ from bazis.core.router import router  # noqa: F401
 
 
 def topics():
-    return sorted(topic for it in get_broker_for_consumer().subscribers for topic in it.topics)
+    # faststream 0.7.8 lists Topic objects instead of the names
+    return sorted(
+        getattr(topic, 'name', topic)
+        for it in get_broker_for_consumer().subscribers
+        for topic in it.topics
+    )
 
 
 for task_path in settings.KAFKA_TASKS:
